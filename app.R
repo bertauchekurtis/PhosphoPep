@@ -1,4 +1,4 @@
-# 5 august 2022
+# 25 august 2022
 # app.R
 
 # ---------- libraries ---------- #
@@ -6,20 +6,59 @@
 library(shiny)
 library(stringr)
 library(shinythemes)
+library(shinyBS)
+library(shinycssloaders)
+library(glmnet)
+library(xgboost)
+library(ranger)
 
 # ---------- OTHER ---------- #
 
+# load sample data
 sampleData <- read.csv("data/testingSet_withVars_DATA_ONE.csv")
+# load models
+load("data/models/slr.RData")
+load("data/models/stepwise.RData")
+load("data/models/ridge.RData")
+load("data/models/lasso.RData")
+load("data/models/elasticNet.RData")
+#load("data/models/rf.RData")
+#svr
+load("data/models/xgb.RData")
+# load sample results
+load("data/sample/slr_sample_result.RData")
+load("data/sample/stepwise_sample_result.RData")
+load("data/sample/ridge_sample_result.RData")
+load("data/sample/lasso_sample_result.RData")
+load("data/sample/elasticNet_sample_result.RData")
+#load("data/sample/svm_sample_result.RData")
+load("data/sample/rf_sample_result.RData")
+load("data/sample/xgb_sample_result.RData")
+colnames(xgb_sample_results) <- c("rmse", "mse", "window", "cor")
+sampleResults <- rbind(slr_sample_result, stepwise_sample_result)
+sampleResults <- rbind(sampleResults, ridge_sample_result)
+sampleResults <- rbind(sampleResults, lasso_sample_result)
+sampleResults <- rbind(sampleResults, elasticNet_sample_result)
+sampleResults <- rbind(sampleResults, rf_sample_result)
+sampleResults <- rbind(sampleResults, xgb_sample_results)
+colnames(sampleResults) <- c("Root Mean Square Error (minutes)", "Mean Absolute Error (minutes)", "95% Error Window Size (minutes)", "Correlation (minutes)")
+row.names(sampleResults) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost")
+sampleRF <- read.csv("data/sample/sample_rf.csv")
 
 # ---------- UI ---------- #
 
-ui <- fluidPage(theme = shinytheme("united"),
-  titlePanel("PhosphoPep"),
-  sidebarLayout(
-    sidebarPanel(
-      h4("How to Format Custom Data:"),
-      p("this is placeholder text")
-    ),
+ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLayout(sidebarPanel(h4("How to Format Custom Data:"),
+                                                                                                 p("Data should be formatted in a single column with a header, \"x\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
+                                                                                                 p("Each peptide should be represented as a character string, with one character per amino acid. Unmodified peptides should use a capitilalized letter and modified peptides should use a lower-case letter."),
+                                                                                                 p("Accepted modifications are phosphorylated serine, threonine, or tyrosine, indicated as \"s\", \"t\", or \"y\", or oxidated methionine, represented with \"m\". Other modifications are not supported."),
+                                                                                                 h4("Example:"),
+                                                                                                 p("x,"),
+                                                                                                 p("AsMTyS,",),
+                                                                                                 p("AAStSyPGD,"),
+                                                                                                 p("HYQmmsDRS,")
+                                                                                                 ),
+    
+                                                                                    
     mainPanel(
       tabsetPanel(
         id = "main",
@@ -27,45 +66,81 @@ ui <- fluidPage(theme = shinytheme("united"),
         tabPanel(
           "Data", 
           br(),
-          p("Data Options:"),
+          
+          h4("Data Options:"),
+          
           radioButtons(
             inputId = "selectDataButton",
             label = "",
             choices = c("Use Sample Data", "Upload Custom Data"),
             selected = "Use Sample Data"
           ),
+          
           br(),
+          
           tabsetPanel(
             id = "dataOptions",
             type = "hidden",
-            tabPanelBody("Use Sample Data",
-                         "Sample Data is Selected"),
-            tabPanelBody("Upload Custom Data", 
-                         p("Upload Custom Data is Selected"),
-                         fileInput(
-                           inputId = "fileUpload",
-                           label = "Upload CSV or TSV File",
-                           multiple = FALSE,
-                           accept = c(".csv", ".tsv")
-                         ),
-
-                        )
-            
+            tabPanelBody("Use Sample Data", h4("Sample Data is Selected")),
+            tabPanelBody("Upload Custom Data", h4("Upload Custom Data is Selected"),fileInput(inputId = "fileUpload",label = "Upload CSV or TSV File",multiple = FALSE,accept = c(".csv", ".tsv")))
           ),
-          plotOutput("exploreHist"),
-          actionButton(inputId = "toModelsButton",
-                       label = "Continue")
-        ),
+          
+          br(),
+          tableOutput(outputId = "datatable"),
+          
+          tabsetPanel(
+            id = "goButton",
+            type = "hidden",
+            tabPanelBody("hide"),
+            tabPanelBody("show", actionButton(inputId = "toModelsButton", label = "Continue"))
+          )
+          
+          
+        ),   # END OF DATA TAB
         tabPanel(
           "Models",
-          p("run predictions"),
-          p("download predictions"),
-          p("results and plots")
-        ),
+          # put any of the models where results aren't cached here
+          br(),
+          
+
+          
+          tabsetPanel(
+            id = "hideIfNoData",
+            type = "hidden",
+            tabPanel(id = "showingIfData", title = "showingIfData",
+                     tabsetPanel(
+                       id ="modelSelect",
+                       type = "pills",
+                       tabPanel(id = "slr_panel", title = "Linear Regression", br(), h4("Linear Regression"),p("Select Results based on Linear Regression model:")),
+                       tabPanel(id = "stepwise_panel", title = "Best Subset Regression", br(), h4("Best Subset Regression"),p("Select Results based on Best Subset Regression model:")),
+                       tabPanel(id = "ridge_panel", title = "Ridge Regression", br(), h4("Ridge Regression"),p("Select Results based on Ridge Regression model:")),
+                       tabPanel(id = "lasso_panel", title = "Lasso Regression", br(), h4("Lasso Regression"),p("Select Results based on Lasso Regression model:")),
+                       tabPanel(id = "elastic_panel", title = "Elastic Net Regression", br(), h4("Elastic Net Regression"),p("Select Results based on Elastic Net Regression Model")),
+                       tabPanel(id = "svr_panel", title = "Support Vector Regression", br(), h4("Support Vector Regression"),p("Select Results based on Support Vector Regression Model")),
+                       tabPanel(id = "rf_panel", title = "Random Forest", br(), h4("Random Forest"),textOutput(outputId = "rf_flag"),bsTooltip(id = "rf_flag", title="Random Forest sample results are precalculated to avoid excessive computations", placement = "left"),),
+                       tabPanel(id = "xgb_panel", title = "XG Boost", br(), h4("Extreme Gradient Boosting"),p("Select Results based on Extreme Gradient Boosted model"))
+                     ),
+                     withSpinner(tableOutput(outputId = "selected_model_results"),  type = 6),
+                     bsTooltip(id = "selected_model_results", title="Predictions are rounded to two decimal places in this table. For unrounded results, download predictions", placement = "left"),
+                     downloadButton(outputId = "download_predictions", "Download Predictions as .csv"),
+                     downloadButton(outputId = "download_predictions_tsv", "Download Predictions as .tsv")
+                     ),
+            tabPanel(id = "notShowingNoData", title = "notShowingNoData", h5("Custom Data has been selected, but a custom data set has not been uploaded yet."))
+          ),
+          
+        ), # END OF MODELS TAB
         tabPanel(
           "About", 
-          p("This is placehodler text"),
-          tableOutput(outputId = "datatable"),
+          br(),
+          p("The models presented here were created using a data set with over 100,000 peptides. Approximately 72,000 peptides were used as a training set to build the models. The remaining peptides serve as a testing set and are presented as the sample data in this application."),
+          p("The accuracy of the models is shown with test results of the sample data set, shown below."),
+          h3("Sample Dataset Results"), 
+          plotOutput(outputId = "rmsePlot"),
+          plotOutput(outputId = "maeplot"),
+          plotOutput(outputId = "windowplot"),
+          plotOutput(outputId = "corplot"),
+          bsTooltip(id = "sampleResultsTable", title="Sample Data Results are pre-calculated and cached to reduce computation time."), 
+          tableOutput(outputId = "sampleResultsTable"),
         )
       )
     )
@@ -76,14 +151,32 @@ ui <- fluidPage(theme = shinytheme("united"),
 
 server <- function(input, output)
 {
-  # TEMP
+
+  ############################################ DATA TAB #######################################
+
+  
+  # show head of data on data upload page
   output$datatable <- renderTable({
-    head(selectedData())
-  })
+    if(input$selectDataButton == "Upload Custom Data")
+    {
+      req(input$fileUpload) 
+    }
+    head(selectedData()[,c("Peptide.Sequence2")])
+  },
+  colnames = FALSE,
+  hover = TRUE
+  )
   
   # handles switching input options based on sample/custom data set
   observeEvent(input$selectDataButton, {
     updateTabsetPanel(inputId = "dataOptions", selected = input$selectDataButton)
+    switch(input$selectDataButton,
+           "Use Sample Data" = {updateTabsetPanel(inputId = "goButton", selected = "show")},
+           "Upload Custom Data" = {
+               updateTabsetPanel(inputId = "goButton", selected = "hide")
+               req(input$fileUpload)
+               updateTabsetPanel(inputId = "goButton", selected = "show")
+             })
   })
   
   # handles uploading custom data set
@@ -105,7 +198,9 @@ server <- function(input, output)
   customDataWithVars <- reactive({
     req(input$fileUpload)
     data <- customData()
-    colnames(data) <- c("Peptide.Sequence2", "RetentionTime")
+    updateTabsetPanel(inputId = "goButton", selected = "show")
+    colnames(data) <- c("Peptide.Sequence2")
+    data$RetentionTime <- 0 # this is done for glmnet predictions - this value is not actually used anywhere
     data$peptideLength <- nchar(data$Peptide.Sequence2)
     data$unmodA <- str_count(data$Peptide.Sequence2, "A")
     data$unmodC <- str_count(data$Peptide.Sequence2, "C")
@@ -141,27 +236,169 @@ server <- function(input, output)
            "Upload Custom Data" = customDataWithVars())
   })
   
-  histogramMainTitle <- reactive({
-    switch(input$selectDataButton,
-           "Use Sample Data" = "Sample Data Retention Time Frequency Histogram",
-           "Upload Custom Data" = "Custom Data Retention Time Frequency Histogram")
-  })
- 
-  # exploratory histogram
-  output$exploreHist <- renderPlot({
-    hist(selectedData()$RetentionTime,
-         main = histogramMainTitle(),
-         xlab = "Retention Time (minutes)",
-         col = "#215563")
-  })
-  
   # to models button
   observeEvent(input$toModelsButton,{
     updateTabsetPanel(inputId = "main", selected = "Models")
   })
   
-}
+  # this is a smarter way to do this
+  observeEvent(input$main, {
+    switch(input$selectDataButton,
+           "Use Sample Data" = {
+             updateTabsetPanel(inputId = "modelResults", selected = "sample")
+             updateTabsetPanel(inputId = "hideIfNoData", selected = "showingIfData")
+           },
+           "Upload Custom Data" = {
+             updateTabsetPanel(inputId = "modelResults", selected = "running")
+             if(is.null(input$fileUpload))
+             {
+               updateTabsetPanel(inputId = "hideIfNoData", selected = "notShowingNoData")
+             }
+             else
+             {
+               updateTabsetPanel(inputId = "hideIfNoData", selected = "showingIfData")
+             }
+           })
+  })
+  
+  ############################################### MODELS TAB #################################
+  
+  # results table
+  output$selected_model_results <- renderTable(
+    head(selected_results()), hover = TRUE, bordered = TRUE
+  )
+  
+  
+  selected_results_no_sequences <- reactive({
+    switch(input$modelSelect,
+           "Linear Regression" = slr_results(),
+           "Best Subset Regression" = stepwise_results(),
+           "Ridge Regression" = ridge_results(),
+           "Lasso Regression" = lasso_results(),
+           "Elastic Net Regression" = elastic_results(),
+         #  "svr_panel" = "",
+           "Random Forest" = rf_results(),
+           "XG Boost" = xgb_results()
+    )
+  })
+  
+  selected_results <- reactive({
+    data.frame(Sequence = selectedData()$Peptide.Sequence2, Prediction = selected_results_no_sequences())
+  })
+                          
+  # slr
+  slr_results <- reactive({
+    predict(slr_one, selectedData())
+  })
+  
+  # stepwise
+  stepwise_results <- reactive({
+    predict(stepwiseModel, selectedData())
+  })
+  
+  # matrix format for data
+  glm_matrix <- reactive({
+    model.matrix(RetentionTime ~ unmodA+unmodC+unmodD+unmodE+unmodF+
+                                 unmodG+unmodH+unmodI+unmodK+unmodL+
+                                 unmodM+unmodN+unmodP+unmodQ+unmodR+
+                                 unmodS+unmodT+unmodV+unmodW+unmodY+
+                                 modS+modY+modT+modM+peptideLength, 
+                 selectedData())[, -1]
+  })
+  
+  # ridge
+  ridge_results <- reactive({
+    predict(ridgeModel, newx = glm_matrix())[,1]
+  })
+  
+  # lasso
+  lasso_results <- reactive({
+    predict(lassoModel, newx = glm_matrix())[,1]
+  })
+  
+  # elastic
+  elastic_results <- reactive({
+    predict(elasticModel, newx = glm_matrix())[,1]
+  })
+  
+  # xgb matrix
+  xgb_matrix <- reactive({
+    xgb.DMatrix(data.matrix(subset(selectedData(), select = c("peptideLength", "unmodA", "unmodC", "unmodD", "unmodE", "unmodF", "unmodG", "unmodH", "unmodI", "unmodK", "unmodL", "unmodM", "unmodN", "unmodP", "unmodQ", "unmodR", "unmodS", "unmodT", "unmodV", "unmodW", "unmodY", "modS", "modT", "modY", "modM"))), label = selectedData()$RetentionTime)
+  })
+  
+  # xgb results
+  xgb_results <- reactive({
+    predict(xgb_model, newdata = xgb_matrix())
+  })
+  
+  rf_results <- reactive({
+    switch(input$selectDataButton,
+           "Use Sample Data" = sampleRF$RetentionTime,
+           "Upload Custom Data" = rf_results_custom()
+    )
+  })
+  
+  rf_results_custom <- reactive({
+    predict(rfModel, selectedData())
+  })
+  
+  # download button
+  output$download_predictions <- downloadHandler(
+    filename = function(){
+      
+      paste0(input$modelSelect, ".csv")
+    },
+    content = function(file){
+      write.csv(selected_results(), file, row.names = FALSE, quote = FALSE)
+    }
+  )
+  
+  # download button (tsv)
+  output$download_predictions_tsv <- downloadHandler(
+    filename = function(){
+      
+      paste0(input$modelSelect, ".tsv")
+    },
+    content = function(file){
+      write.table(selected_results(), file, row.names = FALSE, quote = FALSE, sep = '\t')
+    }
+  )
+  
+  output$rf_flag <- renderText({"Select Results based on Random Forest model:"})
 
+
+  ################################################ ABOUT TAB #################################
+
+  # sample results display
+  output$sampleResultsTable <- renderTable(
+    sampleResults, rownames = TRUE, hover = TRUE
+  )
+  
+  output$rmsePlot <- renderPlot({
+    rbPal <- colorRampPalette(c("green", "blue"))
+    sampleResults$Col <- rbPal(20)[as.numeric(cut(sampleResults[,1],breaks = 20))]
+    barplot(height = sampleResults[,1],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Root Mean Square Error on Sample Data", ylab = "RMSE (Minutes)", xlab = "Model", col = sampleResults$Col)
+  })
+  
+  output$maeplot <- renderPlot({
+    rbPal <- colorRampPalette(c("green", "blue"))
+    sampleResults$Col2 <- rbPal(20)[as.numeric(cut(sampleResults[,2],breaks = 20))]
+    barplot(height = sampleResults[,2],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Mean Absolute Error on Sample Data", ylab = "MAE (Minutes)", xlab = "Model", col = sampleResults$Col2)
+  })
+  
+  output$windowplot <- renderPlot({
+    rbPal <- colorRampPalette(c("green", "blue"))
+    sampleResults$Col3 <- rbPal(20)[as.numeric(cut(sampleResults[,3],breaks = 20))]
+    barplot(height = sampleResults[,3],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "95% Error Window Size on Sample Data", ylab = "Window Size (Minutes)", xlab = "Model", col = sampleResults$Col3)
+  })
+  
+  output$corplot <- renderPlot({
+    rbPal <- colorRampPalette(c("blue", "green"))
+    sampleResults$Col4 <- rbPal(20)[as.numeric(cut(sampleResults[,4],breaks = 20))]
+    barplot(height = sampleResults[,4],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Correlation on Sample Data", xlab = "Model", col = sampleResults$Col4)
+  })
+
+}
 # ---------- SHINY ---------- #
 
 shinyApp(ui = ui, server = server)
