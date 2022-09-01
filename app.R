@@ -72,7 +72,7 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
           radioButtons(
             inputId = "selectDataButton",
             label = "",
-            choices = c("Use Sample Data", "Upload Custom Data"),
+            choices = c("Use Sample Data", "Upload Custom Data", "Upload Custom Data with Alignment Data"),
             selected = "Use Sample Data"
           ),
           
@@ -81,8 +81,15 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
           tabsetPanel(
             id = "dataOptions",
             type = "hidden",
-            tabPanelBody("Use Sample Data", h4("Sample Data is Selected")),
-            tabPanelBody("Upload Custom Data", h4("Upload Custom Data is Selected"),fileInput(inputId = "fileUpload",label = "Upload CSV or TSV File",multiple = FALSE,accept = c(".csv", ".tsv")))
+            tabPanelBody("Use Sample Data", 
+                         h4("Sample Data is Selected")),
+            tabPanelBody("Upload Custom Data", 
+                         h4("Upload Custom Data is Selected"),
+                         fileInput(inputId = "fileUpload",label = "Upload CSV or TSV File",multiple = FALSE,accept = c(".csv", ".tsv"))),
+            tabPanelBody("Upload Custom Data with Alignment Data", 
+                         h4("Upload Custom Data with Alignment Data is Selected"),
+                         fileInput(inputId = "alignFileUpload",label="Upload CSV or TSV File of Alignment Data"),multiple = FALSE, accept = c(".csv",".tsv"),
+                         fileInput(inputId = "fileUpload2",label = "Upload CSV or TSV File of Data to Predict"),multiple = FALSE,accept = c(".csv",".tsv"))
           ),
           
           br(),
@@ -161,6 +168,11 @@ server <- function(input, output)
     {
       req(input$fileUpload) 
     }
+    
+    if(input$selectDataButton == "Upload Custom Data with Alignment Data")
+    {
+      req(input$fileUpload2)
+    }
     head(selectedData()[,c("Peptide.Sequence2")])
   },
   colnames = FALSE,
@@ -176,27 +188,59 @@ server <- function(input, output)
                updateTabsetPanel(inputId = "goButton", selected = "hide")
                req(input$fileUpload)
                updateTabsetPanel(inputId = "goButton", selected = "show")
-             })
+           },
+           "Upload Custom Data with Alignment Data" = {
+               updateTabsetPanel(inputId = "goButton", selected = "hide")
+               req(input$fileUpload2)
+               req(input$alignFileUpload)
+               updateTabsetPanel(inputId = "goButton", selected = "show")
+           })
   })
   
   # handles uploading custom data set
   customData <- reactive({
-    req(input$fileUpload)
-    # validate extension
-    fileExtension <- tools::file_ext(input$fileUpload$name)
-    # read file
-    switch(fileExtension,
-      # csv
-      csv = read.csv(input$fileUpload$datapath),
-      # tsv
-      tsv = read.csv(input$fileUpload$datapath, sep = "\t"),
-      validate("Error: File is not of type .csv or .tsv")
-    )
+    # read from either fileUpload or fileUpload 2
+    if(input$selectDataButton == "Upload Custom Data")
+    {
+      req(input$fileUpload)
+      # validate extension
+      fileExtension <- tools::file_ext(input$fileUpload$name)
+      # read file
+      switch(fileExtension,
+             # csv
+             csv = read.csv(input$fileUpload$datapath),
+             # tsv
+             tsv = read.csv(input$fileUpload$datapath, sep = "\t"),
+             validate("Error: File is not of type .csv or .tsv")
+      )
+    }
+    else
+    {
+      req(input$fileUpload2)
+      # validate extension
+      fileExtension <- tools::file_ext(input$fileUpload2$name)
+      # read file
+      switch(fileExtension,
+             # csv
+             csv = read.csv(input$fileUpload2$datapath),
+             # tsv
+             tsv = read.csv(input$fileUpload2$datapath, sep = "\t"),
+             validate("Error: File is not of type .csv or .tsv")
+      )
+    }
+
   })
   
   # encode a custom data set
   customDataWithVars <- reactive({
-    req(input$fileUpload)
+    if(input$selectDataButton == "Upload Custom Data")
+    {
+      req(input$fileUpload)
+    }
+    else
+    {
+      req(input$fileUpload2)
+    }
     data <- customData()
     updateTabsetPanel(inputId = "goButton", selected = "show")
     colnames(data) <- c("Peptide.Sequence2")
@@ -233,7 +277,54 @@ server <- function(input, output)
   selectedData <- reactive({
     switch(input$selectDataButton,
            "Use Sample Data" = sampleData,
-           "Upload Custom Data" = customDataWithVars())
+           "Upload Custom Data" = customDataWithVars(),
+           "Upload Custom Data with Alignment Data" = customDataWithVars())
+  })
+  
+  alignmentData <- reactive({
+    req(input$alignFileUpload)
+    # validate extension
+    fileExtension <- tools::file_ext(input$alignFileUpload$name)
+    # read file
+    switch(fileExtension,
+           # csv
+           csv = read.csv(input$alignFileUpload$datapath),
+           # tsv
+           tsv = read.csv(input$alignFileUpload$datapath, sep = "\t"),
+           validate("Error: File is not of type .csv or .tsv")
+    )
+  })
+  
+  alignmentDataWithVars <- reactive({
+    data <- alignmentData()
+    updateTabsetPanel(inputId = "goButton", selected = "show")
+    colnames(data) <- c("Peptide.Sequence2", "RetentionTime")
+    data$peptideLength <- nchar(data$Peptide.Sequence2)
+    data$unmodA <- str_count(data$Peptide.Sequence2, "A")
+    data$unmodC <- str_count(data$Peptide.Sequence2, "C")
+    data$unmodD <- str_count(data$Peptide.Sequence2, "D")
+    data$unmodE <- str_count(data$Peptide.Sequence2, "E")
+    data$unmodF <- str_count(data$Peptide.Sequence2, "F")
+    data$unmodG <- str_count(data$Peptide.Sequence2, "G")
+    data$unmodH <- str_count(data$Peptide.Sequence2, "H")
+    data$unmodI <- str_count(data$Peptide.Sequence2, "I")
+    data$unmodK <- str_count(data$Peptide.Sequence2, "K")
+    data$unmodL <- str_count(data$Peptide.Sequence2, "L")
+    data$unmodM <- str_count(data$Peptide.Sequence2, "M")
+    data$unmodN <- str_count(data$Peptide.Sequence2, "N")
+    data$unmodP <- str_count(data$Peptide.Sequence2, "P")
+    data$unmodQ <- str_count(data$Peptide.Sequence2, "Q")
+    data$unmodR <- str_count(data$Peptide.Sequence2, "R")
+    data$unmodS <- str_count(data$Peptide.Sequence2, "S")
+    data$unmodT <- str_count(data$Peptide.Sequence2, "T")
+    data$unmodV <- str_count(data$Peptide.Sequence2, "V")
+    data$unmodW <- str_count(data$Peptide.Sequence2, "W")
+    data$unmodY <- str_count(data$Peptide.Sequence2, "Y")
+    data$modS <- str_count(data$Peptide.Sequence2, "s")
+    data$modT <- str_count(data$Peptide.Sequence2, "t")
+    data$modY <- str_count(data$Peptide.Sequence2, "y")
+    data$modM <- str_count(data$Peptide.Sequence2, "m")
+    data
   })
   
   # to models button
@@ -251,6 +342,16 @@ server <- function(input, output)
            "Upload Custom Data" = {
              updateTabsetPanel(inputId = "modelResults", selected = "running")
              if(is.null(input$fileUpload))
+             {
+               updateTabsetPanel(inputId = "hideIfNoData", selected = "notShowingNoData")
+             }
+             else
+             {
+               updateTabsetPanel(inputId = "hideIfNoData", selected = "showingIfData")
+             }
+           },
+           "Upload Custom Data with Alignment Data" = {
+             if(is.null(input$fileUpload2) || is.null(input$alignFileUpload))
              {
                updateTabsetPanel(inputId = "hideIfNoData", selected = "notShowingNoData")
              }
@@ -288,12 +389,63 @@ server <- function(input, output)
                           
   # slr
   slr_results <- reactive({
-    predict(slr_one, selectedData())
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(slr_one, selectedData())
+    }
+    else
+    {
+      # predict the alignment data with slr
+      predictions_of_alignment_data <- predict(slr_one, alignmentDataWithVars())
+      #print(head(predictions_of_alignment_data)) #### DEBUG
+      #print(length(predictions_of_alignment_data)) #### DEBUG
+      
+      # make a data frame for the lm we are about to create
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      #print(head(align_df)) #### DEBUG
+      #print(nrow(align_df)) #### DEBUG
+      
+      # make a SLR model for alignment
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      # now, we do the predictions of the data we want to predict
+      predictions_of_selected_data <- predict(slr_one, selectedData())
+      
+      #print(head(predictions_of_selected_data)) #### DEBUG
+      #print(length(predictions_of_selected_data)) #### DEBUG
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      # now, we run the predictions_of_selected_data through the new_LM to align it
+      final_predictions <- predict(new_LM, new_df)
+    }
   })
   
   # stepwise
   stepwise_results <- reactive({
-    predict(stepwiseModel, selectedData())
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(stepwiseModel, selectedData())
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(stepwiseModel, alignmentDataWithVars())
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(stepwiseModel, selectedData())
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
   })
   
   # matrix format for data
@@ -306,19 +458,86 @@ server <- function(input, output)
                  selectedData())[, -1]
   })
   
-  # ridge
-  ridge_results <- reactive({
-    predict(ridgeModel, newx = glm_matrix())[,1]
+  # matrix format for alignment data
+  glm_matrix_align <- reactive({
+    model.matrix(RetentionTime ~ unmodA+unmodC+unmodD+unmodE+unmodF+
+                   unmodG+unmodH+unmodI+unmodK+unmodL+
+                   unmodM+unmodN+unmodP+unmodQ+unmodR+
+                   unmodS+unmodT+unmodV+unmodW+unmodY+
+                   modS+modY+modT+modM+peptideLength, 
+                 alignmentDataWithVars())[, -1]
   })
   
+  # ridge
+  ridge_results <- reactive({
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(ridgeModel, newx = glm_matrix())[,1]
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(ridgeModel, newx = glm_matrix_align())[,1]
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(ridgeModel, newx = glm_matrix())[,1]
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
+  })
+
   # lasso
   lasso_results <- reactive({
-    predict(lassoModel, newx = glm_matrix())[,1]
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(lassoModel, newx = glm_matrix())[,1]
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(lassoModel, newx = glm_matrix_align())[,1]
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(lassoModel, newx = glm_matrix())[,1]
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
   })
   
   # elastic
   elastic_results <- reactive({
-    predict(elasticModel, newx = glm_matrix())[,1]
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(elasticModel, newx = glm_matrix())[,1]
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(elasticModel, newx = glm_matrix_align())[,1]
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(elasticModel, newx = glm_matrix())[,1]
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
   })
   
   # xgb matrix
@@ -326,20 +545,60 @@ server <- function(input, output)
     xgb.DMatrix(data.matrix(subset(selectedData(), select = c("peptideLength", "unmodA", "unmodC", "unmodD", "unmodE", "unmodF", "unmodG", "unmodH", "unmodI", "unmodK", "unmodL", "unmodM", "unmodN", "unmodP", "unmodQ", "unmodR", "unmodS", "unmodT", "unmodV", "unmodW", "unmodY", "modS", "modT", "modY", "modM"))), label = selectedData()$RetentionTime)
   })
   
+  xgb_matrix_align <- reactive({
+    xgb.DMatrix(data.matrix(subset(alignmentDataWithVars(), select = c("peptideLength", "unmodA", "unmodC", "unmodD", "unmodE", "unmodF", "unmodG", "unmodH", "unmodI", "unmodK", "unmodL", "unmodM", "unmodN", "unmodP", "unmodQ", "unmodR", "unmodS", "unmodT", "unmodV", "unmodW", "unmodY", "modS", "modT", "modY", "modM"))), label = alignmentDataWithVars()$RetentionTime)
+  })
+  
   # xgb results
   xgb_results <- reactive({
-    predict(xgb_model, newdata = xgb_matrix())
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(xgb_model, newdata = xgb_matrix())
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(xgb_model, newdata = xgb_matrix_align())
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(xgb_model, newdata = xgb_matrix())
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
   })
   
   rf_results <- reactive({
     switch(input$selectDataButton,
            "Use Sample Data" = sampleRF$RetentionTime,
-           "Upload Custom Data" = rf_results_custom()
+           "Upload Custom Data" = rf_results_custom(),
+           "Upload Custom Data with Alignment Data" = rf_results_align()
     )
   })
   
   rf_results_custom <- reactive({
     predict(rfModel, selectedData())
+  })
+  
+  rf_results_align <- reactive({
+    predictions_of_alignment_data <- predict(rfModel, alignmentDataWithVars())
+    
+    align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+    colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+    
+    new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+    
+    predictions_of_selected_data <- predict(rfModel, selectedData())
+    
+    new_df <- as.data.frame(predictions_of_selected_data)
+    colnames(new_df) <- c("predicts_of_align")
+    
+    final_predictions <- predict(new_LM, new_df)
   })
   
   # download button
