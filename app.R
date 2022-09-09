@@ -1,4 +1,4 @@
-# 25 august 2022
+# 2 september 2022
 # app.R
 
 # ---------- libraries ---------- #
@@ -11,11 +11,15 @@ library(shinycssloaders)
 library(glmnet)
 library(xgboost)
 library(ranger)
+library(plotrix)
 
 # ---------- OTHER ---------- #
 
 # load sample data
 sampleData <- read.csv("data/testingSet_withVars_DATA_ONE.csv")
+xgb_results_preCalc <- read.csv("data/sample/XG Boost Results.csv")
+
+slr_full_pre <- read.csv("C:/Users/kurti/Downloads/Linear Regression full.csv")
 # load models
 load("data/models/slr.RData")
 load("data/models/stepwise.RData")
@@ -23,7 +27,7 @@ load("data/models/ridge.RData")
 load("data/models/lasso.RData")
 load("data/models/elasticNet.RData")
 #load("data/models/rf.RData")
-#svr
+load("data/models/svmModel.RData")
 load("data/models/xgb.RData")
 # load sample results
 load("data/sample/slr_sample_result.RData")
@@ -31,9 +35,9 @@ load("data/sample/stepwise_sample_result.RData")
 load("data/sample/ridge_sample_result.RData")
 load("data/sample/lasso_sample_result.RData")
 load("data/sample/elasticNet_sample_result.RData")
-#load("data/sample/svm_sample_result.RData")
 load("data/sample/rf_sample_result.RData")
 load("data/sample/xgb_sample_result.RData")
+load("data/sample/svm_sample_result.Rdata")
 colnames(xgb_sample_results) <- c("rmse", "mse", "window", "cor")
 sampleResults <- rbind(slr_sample_result, stepwise_sample_result)
 sampleResults <- rbind(sampleResults, ridge_sample_result)
@@ -41,23 +45,98 @@ sampleResults <- rbind(sampleResults, lasso_sample_result)
 sampleResults <- rbind(sampleResults, elasticNet_sample_result)
 sampleResults <- rbind(sampleResults, rf_sample_result)
 sampleResults <- rbind(sampleResults, xgb_sample_results)
+sampleResults <- rbind(sampleResults, svm_sample_result)
 colnames(sampleResults) <- c("Root Mean Square Error (minutes)", "Mean Absolute Error (minutes)", "95% Error Window Size (minutes)", "Correlation (minutes)")
-row.names(sampleResults) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost")
+row.names(sampleResults) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost", "Support Vector Regression")
 sampleRF <- read.csv("data/sample/sample_rf.csv")
+
+load("data/sample/slr_r_p.RData")
+load("data/sample/step_r_p.RData")
+load("data/sample/ridge_r_p.RData")
+load("data/sample/lasso_r_p.RData")
+load("data/sample/elastic_r_p.RData")
+load("data/sample/rf_r_p.RData")
+load("data/sample/xgb_r_p.RData")
+load("data/sample/svr_r_p.RData")
+
+sampleResults_p <- rbind(slr_r, step_r)
+sampleResults_p <- rbind(sampleResults_p, ridge_r)
+sampleResults_p <- rbind(sampleResults_p, lasso_r)
+sampleResults_p <- rbind(sampleResults_p, elastic_r)
+sampleResults_p <- rbind(sampleResults_p, rf_r)
+sampleResults_p <- rbind(sampleResults_p, xgb_r)
+sampleResults_p <- rbind(sampleResults_p, svr_r)
+
+row.names(sampleResults_p) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost", "Support Vector Regression")
+colnames(sampleResults_p) <- c("Root Mean Square Error (minutes)", "Mean Absolute Error (minutes)", "95% Error Window Size (minutes)", "Correlation (minutes)")
+
+# load window data
+load("data/sample/window/slr_w.RData")
+load("data/sample/window/step_w.RData")
+load("data/sample/window/lasso_w.RData")
+load("data/sample/window/ridge_w.RData")
+load("data/sample/window/elastic_w.RData")
+load("data/sample/window/rf_w.RData")
+load("data/sample/window/xgb_w.RData")
+load("data/sample/window/svr_w.RData")
+
+windowResults <- rbind(slr_w, step_w)
+windowResults <- rbind(windowResults, ridge_w)
+windowResults <- rbind(windowResults, lasso_w)
+windowResults <- rbind(windowResults, elastic_w)
+windowResults <- rbind(windowResults, rf_w)
+windowResults <- rbind(windowResults, xgb_w)
+windowResults <- rbind(windowResults, svr_w)
+
+colnames(windowResults) <- c("size", "low", "high", "mean")
 
 # ---------- UI ---------- #
 
-ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLayout(sidebarPanel(h4("How to Format Custom Data:"),
-                                                                                                 p("Data should be formatted in a single column with a header, \"x\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
-                                                                                                 p("Each peptide should be represented as a character string, with one character per amino acid. Unmodified peptides should use a capitilalized letter and modified peptides should use a lower-case letter."),
-                                                                                                 p("Accepted modifications are phosphorylated serine, threonine, or tyrosine, indicated as \"s\", \"t\", or \"y\", or oxidated methionine, represented with \"m\". Other modifications are not supported."),
-                                                                                                 h4("Example:"),
-                                                                                                 p("x,"),
-                                                                                                 p("AsMTyS,",),
-                                                                                                 p("AAStSyPGD,"),
-                                                                                                 p("HYQmmsDRS,")
-                                                                                                 ),
+ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLayout(
+  sidebarPanel(
     
+    tabsetPanel(
+      id = "sidebar",
+      type = "hidden",
+      tabPanel(id = "Use Sample Data", title = "Use Sample Data",  
+               p("The sample data set is the testing set from the data set that was used to train the models and contains about 26,000 peptides. Results of model accuracy on the sample set can be found on the \"About\" tab. ")),
+      tabPanel(id = "Upload Custom Data", title = "Upload Custom Data",
+               h4("How to Format Custom Data:"),
+               p("Data should be formatted in a single column with a header, \"PeptideSequence\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
+               p("Each peptide should be represented as a character string, with one character per amino acid. Unmodified peptides should use a capitilalized letter and modified peptides should use a lower-case letter."),
+               p("Accepted modifications are phosphorylated serine, threonine, or tyrosine, indicated as \"s\", \"t\", or \"y\", or oxidated methionine, represented with \"m\". Other modifications are not supported."),
+               h4("Example:"),
+               p("PeptideSequence,"),
+               p("AsMTyS,"),
+               p("AAStSyPGD,"),
+               p("HYQmmsDRS,")),
+      tabPanel(id = "Upload Custom Data with Alignment Data", title = "Upload Custom Data with Alignment Data",
+               h4("How to Format Custom Data with Alignment:"),
+               p("Data should be formatted into two files."),
+               h4("Alignment Data File:"),
+               p("Alignment data should be formatted into two columns with headers, \"PeptideSequence\" and \"Retention Time\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
+               p("Each peptide should be represented as a character string, with one character per amino acid. Unmodified peptides should use a capitilalized letter and modified peptides should use a lower-case letter."),
+               p("Accepted modifications are phosphorylated serine, threonine, or tyrosine, indicated as \"s\", \"t\", or \"y\", or oxidated methionine, represented with \"m\". Other modifications are not supported."),
+               p("The retention time should be in the second column and be represnted in minutes."),
+               h4("Example:"),
+               p("PeptideSequence, RetentionTime,"),
+               p("AsMTyS, 12.67,"),
+               p("MTsYRRS, 20.32,"),
+               p("QHtSmY, 14.98,"),
+               h4("Data to Predict File:"),
+               p("Data should be formatted in a single column with a header, \"PeptideSequence\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
+               p("Each peptide should be represented as a character string, with one character per amino acid. Unmodified peptides should use a capitilalized letter and modified peptides should use a lower-case letter."),
+               p("Accepted modifications are phosphorylated serine, threonine, or tyrosine, indicated as \"s\", \"t\", or \"y\", or oxidated methionine, represented with \"m\". Other modifications are not supported."),
+               h4("Example:"),
+               p("PeptideSequene,"),
+               p("AsMTyS,"),
+               p("AAStSyPGD"),
+               p("HYQmmsDRS,"))
+    )
+    ), # end of sidebar panel
+    
+    
+  
                                                                                     
     mainPanel(
       tabsetPanel(
@@ -129,6 +208,7 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
                      ),
                      withSpinner(tableOutput(outputId = "selected_model_results"),  type = 6),
                      bsTooltip(id = "selected_model_results", title="Predictions are rounded to two decimal places in this table. For unrounded results, download predictions", placement = "left"),
+                     
                      downloadButton(outputId = "download_predictions", "Download Predictions as .csv"),
                      downloadButton(outputId = "download_predictions_tsv", "Download Predictions as .tsv")
                      ),
@@ -142,12 +222,15 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
           p("The models presented here were created using a data set with over 100,000 peptides. Approximately 72,000 peptides were used as a training set to build the models. The remaining peptides serve as a testing set and are presented as the sample data in this application."),
           p("The accuracy of the models is shown with test results of the sample data set, shown below."),
           h3("Sample Dataset Results"), 
-          plotOutput(outputId = "rmsePlot"),
-          plotOutput(outputId = "maeplot"),
-          plotOutput(outputId = "windowplot"),
-          plotOutput(outputId = "corplot"),
-          bsTooltip(id = "sampleResultsTable", title="Sample Data Results are pre-calculated and cached to reduce computation time."), 
+          plotOutput(outputId = "xgb_residuals"),
+          plotOutput(outputId = "SLR_residuals"),
+          plotOutput(outputId = "window_plot"),
+          h3("Performance Metrics for Sample Data Set"),
+          bsTooltip(id = "sampleResultsTable", title="Sample Data Results are pre-calculated and cached to reduce computation time.", placement = "left"), 
           tableOutput(outputId = "sampleResultsTable"),
+          h3("Performance Metrics for Sample Data Set - Phosphorylated Peptides Only"),
+          bsTooltip(id = "sampleResultsTablePhos", title="Sample Data Results are pre-calculated and cached to reduce computation time.", placement = "left"), 
+          tableOutput(outputId = "sampleResultsTablePhos"),
         )
       )
     )
@@ -182,6 +265,7 @@ server <- function(input, output)
   # handles switching input options based on sample/custom data set
   observeEvent(input$selectDataButton, {
     updateTabsetPanel(inputId = "dataOptions", selected = input$selectDataButton)
+    updateTabsetPanel(inputId = "sidebar", selected = input$selectDataButton)
     switch(input$selectDataButton,
            "Use Sample Data" = {updateTabsetPanel(inputId = "goButton", selected = "show")},
            "Upload Custom Data" = {
@@ -369,6 +453,8 @@ server <- function(input, output)
     head(selected_results()), hover = TRUE, bordered = TRUE
   )
   
+
+  
   
   selected_results_no_sequences <- reactive({
     switch(input$modelSelect,
@@ -377,7 +463,7 @@ server <- function(input, output)
            "Ridge Regression" = ridge_results(),
            "Lasso Regression" = lasso_results(),
            "Elastic Net Regression" = elastic_results(),
-         #  "svr_panel" = "",
+           "Support Vector Regression" = svm_results(),
            "Random Forest" = rf_results(),
            "XG Boost" = xgb_results()
     )
@@ -581,6 +667,32 @@ server <- function(input, output)
     )
   })
   
+  svm_results <- reactive({
+
+    
+    
+    if(input$selectDataButton != "Upload Custom Data with Alignment Data")
+    {
+      predict(svmModel, selectedData())
+    }
+    else
+    {
+      predictions_of_alignment_data <- predict(svmModel, alignmentDataWithVars())
+      
+      align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
+      colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
+      
+      new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
+      
+      predictions_of_selected_data <- predict(svmModel, selectedData())
+      
+      new_df <- as.data.frame(predictions_of_selected_data)
+      colnames(new_df) <- c("predicts_of_align")
+      
+      final_predictions <- predict(new_LM, new_df)
+    }
+  })
+  
   rf_results_custom <- reactive({
     predict(rfModel, selectedData())
   })
@@ -633,30 +745,64 @@ server <- function(input, output)
     sampleResults, rownames = TRUE, hover = TRUE
   )
   
-  output$rmsePlot <- renderPlot({
-    rbPal <- colorRampPalette(c("green", "blue"))
-    sampleResults$Col <- rbPal(20)[as.numeric(cut(sampleResults[,1],breaks = 20))]
-    barplot(height = sampleResults[,1],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Root Mean Square Error on Sample Data", ylab = "RMSE (Minutes)", xlab = "Model", col = sampleResults$Col)
+  output$sampleResultsTablePhos <- renderTable(
+    sampleResults_p, rownames = TRUE, hover = TRUE
+  )
+  
+  xgb_colors <- reactive({
+    rbPal <- colorRampPalette(c("#117833", "#f54242"))
+    res <- sampleData$RetentionTime - xgb_results_preCalc$Prediction
+    mod_res <- (abs(res)) ^ (1/3)
+    col <- rbPal(200)[as.numeric(cut(mod_res,breaks = 200))]
+    col
   })
   
-  output$maeplot <- renderPlot({
-    rbPal <- colorRampPalette(c("green", "blue"))
-    sampleResults$Col2 <- rbPal(20)[as.numeric(cut(sampleResults[,2],breaks = 20))]
-    barplot(height = sampleResults[,2],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Mean Absolute Error on Sample Data", ylab = "MAE (Minutes)", xlab = "Model", col = sampleResults$Col2)
+  slr_colors <- reactive({
+    rbPal7 <- colorRampPalette(c("#117833", "#f54242"))
+    res <- sampleData$RetentionTime - slr_full_pre$Prediction
+    mod_res <- (abs(res)) ^ (1/3)
+    col <- rbPal7(200)[as.numeric(cut(mod_res,breaks=200))]
+    col
   })
   
-  output$windowplot <- renderPlot({
-    rbPal <- colorRampPalette(c("green", "blue"))
-    sampleResults$Col3 <- rbPal(20)[as.numeric(cut(sampleResults[,3],breaks = 20))]
-    barplot(height = sampleResults[,3],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "95% Error Window Size on Sample Data", ylab = "Window Size (Minutes)", xlab = "Model", col = sampleResults$Col3)
+  output$xgb_residuals <- renderPlot({
+    plot(x = sampleData$RetentionTime, 
+         y = xgb_results_preCalc$Prediction, 
+         col = xgb_colors(),
+         xlab = "Actual Retention Time (minutes)",
+         ylab = "Acutal Retention Time (mintues)",
+         main = "Predicted vs. Actual Retention Times for XG Boost Model")
+    abline(a = 0, b = 1)
   })
   
-  output$corplot <- renderPlot({
-    rbPal <- colorRampPalette(c("blue", "green"))
-    sampleResults$Col4 <- rbPal(20)[as.numeric(cut(sampleResults[,4],breaks = 20))]
-    barplot(height = sampleResults[,4],names.arg = c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB"),  horiz = FALSE, main = "Correlation on Sample Data", xlab = "Model", col = sampleResults$Col4)
+  output$SLR_residuals <- renderPlot({
+    plot(x = sampleData$RetentionTime, 
+         y = slr_full_pre$Prediction, 
+         col = slr_colors(),
+         xlab = "Actual Retention Time (minutes)",
+         ylab = "Acutal Retention Time (mintues)",
+         main = "Predicted vs. Actual Retention Times for Linear Regression Model")
+    abline(a = 0, b = 1)
+    })
+  
+  
+  output$window_plot <- renderPlot({
+    plotCI(x =1:8,
+           y = windowResults[,4],
+           li = windowResults[,2],
+           ui = windowResults[,3],
+           axes = FALSE,
+           xlab = "",
+           ylab = "Error Size (minutes)",
+           main = "95% Error Window Size",
+           col = "red",
+           scol = "black"
+           )
+    axis(side=2)         ## add default y-axis (ticks+labels)
+    axis(side=1,at=1:8,label=c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB", "SVM"))
+    box(bty = "l")
   })
-
+  
 }
 # ---------- SHINY ---------- #
 
