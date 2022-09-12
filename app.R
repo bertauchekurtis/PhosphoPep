@@ -1,5 +1,6 @@
-# 2 september 2022
+# 12 september 2022
 # app.R
+# kurtis bertauche
 
 # ---------- libraries ---------- #
 
@@ -10,84 +11,79 @@ library(shinyBS)
 library(shinycssloaders)
 library(glmnet)
 library(xgboost)
-library(ranger)
 library(plotrix)
 
 # ---------- OTHER ---------- #
 
-# load sample data
+# load necessary data sets
 sampleData <- read.csv("data/testingSet_withVars_DATA_ONE.csv")
 xgb_results_preCalc <- read.csv("data/sample/XG Boost Results.csv")
+slr_full_pre <- read.csv("data/sample/Linear Regression full.csv")
 
-slr_full_pre <- read.csv("C:/Users/kurti/Downloads/Linear Regression full.csv")
 # load models
 load("data/models/slr.RData")
 load("data/models/stepwise.RData")
 load("data/models/ridge.RData")
 load("data/models/lasso.RData")
 load("data/models/elasticNet.RData")
-#load("data/models/rf.RData")
 load("data/models/svmModel.RData")
 load("data/models/xgb.RData")
+
 # load sample results
 load("data/sample/slr_sample_result.RData")
 load("data/sample/stepwise_sample_result.RData")
 load("data/sample/ridge_sample_result.RData")
 load("data/sample/lasso_sample_result.RData")
 load("data/sample/elasticNet_sample_result.RData")
-load("data/sample/rf_sample_result.RData")
 load("data/sample/xgb_sample_result.RData")
 load("data/sample/svm_sample_result.Rdata")
+
+# combine sample results into singular object
 colnames(xgb_sample_results) <- c("rmse", "mse", "window", "cor")
 sampleResults <- rbind(slr_sample_result, stepwise_sample_result)
 sampleResults <- rbind(sampleResults, ridge_sample_result)
 sampleResults <- rbind(sampleResults, lasso_sample_result)
 sampleResults <- rbind(sampleResults, elasticNet_sample_result)
-sampleResults <- rbind(sampleResults, rf_sample_result)
 sampleResults <- rbind(sampleResults, xgb_sample_results)
 sampleResults <- rbind(sampleResults, svm_sample_result)
 colnames(sampleResults) <- c("Root Mean Square Error (minutes)", "Mean Absolute Error (minutes)", "95% Error Window Size (minutes)", "Correlation (minutes)")
-row.names(sampleResults) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost", "Support Vector Regression")
-sampleRF <- read.csv("data/sample/sample_rf.csv")
+row.names(sampleResults) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "XG Boost", "Support Vector Regression")
 
+# load sample results - phospho peptides only!
 load("data/sample/slr_r_p.RData")
 load("data/sample/step_r_p.RData")
 load("data/sample/ridge_r_p.RData")
 load("data/sample/lasso_r_p.RData")
 load("data/sample/elastic_r_p.RData")
-load("data/sample/rf_r_p.RData")
 load("data/sample/xgb_r_p.RData")
 load("data/sample/svr_r_p.RData")
 
+# combine sample phospho results into singular object
 sampleResults_p <- rbind(slr_r, step_r)
 sampleResults_p <- rbind(sampleResults_p, ridge_r)
 sampleResults_p <- rbind(sampleResults_p, lasso_r)
 sampleResults_p <- rbind(sampleResults_p, elastic_r)
-sampleResults_p <- rbind(sampleResults_p, rf_r)
 sampleResults_p <- rbind(sampleResults_p, xgb_r)
 sampleResults_p <- rbind(sampleResults_p, svr_r)
-
-row.names(sampleResults_p) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "Random Forest", "XG Boost", "Support Vector Regression")
+row.names(sampleResults_p) <- c("Simple Linear Regression", "Stepwise Regresion", "Ridge Regression", "Lasso Regression", "Elastic Net Regression", "XG Boost", "Support Vector Regression")
 colnames(sampleResults_p) <- c("Root Mean Square Error (minutes)", "Mean Absolute Error (minutes)", "95% Error Window Size (minutes)", "Correlation (minutes)")
 
-# load window data
+# load 95% error window results (more detail than regular sample results)
 load("data/sample/window/slr_w.RData")
 load("data/sample/window/step_w.RData")
 load("data/sample/window/lasso_w.RData")
 load("data/sample/window/ridge_w.RData")
 load("data/sample/window/elastic_w.RData")
-load("data/sample/window/rf_w.RData")
 load("data/sample/window/xgb_w.RData")
 load("data/sample/window/svr_w.RData")
 
+# combine window data into one object
 windowResults <- rbind(slr_w, step_w)
 windowResults <- rbind(windowResults, ridge_w)
 windowResults <- rbind(windowResults, lasso_w)
 windowResults <- rbind(windowResults, elastic_w)
-windowResults <- rbind(windowResults, rf_w)
 windowResults <- rbind(windowResults, xgb_w)
 windowResults <- rbind(windowResults, svr_w)
-
 colnames(windowResults) <- c("size", "low", "high", "mean")
 
 # ---------- UI ---------- #
@@ -95,11 +91,16 @@ colnames(windowResults) <- c("size", "low", "high", "mean")
 ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLayout(
   sidebarPanel(
     
+    # create separate views on sidebar with instructions on how to upload data
     tabsetPanel(
       id = "sidebar",
       type = "hidden",
+      
+      # sample data tab - information about sample data
       tabPanel(id = "Use Sample Data", title = "Use Sample Data",  
                p("The sample data set is the testing set from the data set that was used to train the models and contains about 26,000 peptides. Results of model accuracy on the sample set can be found on the \"About\" tab. ")),
+      
+      # upload custom data tab - instructions on formatting
       tabPanel(id = "Upload Custom Data", title = "Upload Custom Data",
                h4("How to Format Custom Data:"),
                p("Data should be formatted in a single column with a header, \"PeptideSequence\". Accepted file types are .csv (comma separated values) or .tsv (tab separated values)."),
@@ -110,6 +111,8 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
                p("AsMTyS,"),
                p("AAStSyPGD,"),
                p("HYQmmsDRS,")),
+      
+      # upload custom data with alignment file - instructions on formatting
       tabPanel(id = "Upload Custom Data with Alignment Data", title = "Upload Custom Data with Alignment Data",
                h4("How to Format Custom Data with Alignment:"),
                p("Data should be formatted into two files."),
@@ -132,22 +135,23 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
                p("AsMTyS,"),
                p("AAStSyPGD"),
                p("HYQmmsDRS,"))
-    )
+        )
     ), # end of sidebar panel
     
-    
-  
-                                                                                    
     mainPanel(
+      
+      # panel for switching between different views - data, models, about
       tabsetPanel(
         id = "main",
         type = "tabs",
+        
+        # data panel - where users can select their option for data
         tabPanel(
           "Data", 
           br(),
-          
           h4("Data Options:"),
           
+          # multiple choice options for which data to use
           radioButtons(
             inputId = "selectDataButton",
             label = "",
@@ -157,14 +161,21 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
           
           br(),
           
+          # tabset panel to show needed file uploads etc. depending on which data user has selected
           tabsetPanel(
             id = "dataOptions",
             type = "hidden",
+            
+            # sample data option - just show status message
             tabPanelBody("Use Sample Data", 
                          h4("Sample Data is Selected")),
+            
+            # custom data option - status message + upload button
             tabPanelBody("Upload Custom Data", 
                          h4("Upload Custom Data is Selected"),
                          fileInput(inputId = "fileUpload",label = "Upload CSV or TSV File",multiple = FALSE,accept = c(".csv", ".tsv"))),
+            
+            # custom data + alignment - status message + 2 upload buttons (predcition data and alignemtn)
             tabPanelBody("Upload Custom Data with Alignment Data", 
                          h4("Upload Custom Data with Alignment Data is Selected"),
                          fileInput(inputId = "alignFileUpload",label="Upload CSV or TSV File of Alignment Data"),multiple = FALSE, accept = c(".csv",".tsv"),
@@ -172,8 +183,11 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
           ),
           
           br(),
+          
+          # show sample of data option that user selected
           tableOutput(outputId = "datatable"),
           
+          # tabset panel to show/hide continue button depending on data being valid
           tabsetPanel(
             id = "goButton",
             type = "hidden",
@@ -181,52 +195,80 @@ ui <- fluidPage(theme = shinytheme("united"),titlePanel("PhosphoPep"),sidebarLay
             tabPanelBody("show", actionButton(inputId = "toModelsButton", label = "Continue"))
           )
           
-          
-        ),   # END OF DATA TAB
+        ), 
+        # END OF DATA TAB
+        
+        # models panel - where users are able to run their selected data through the models
         tabPanel(
           "Models",
-          # put any of the models where results aren't cached here
           br(),
           
-
-          
+          # additional tabset panel - allows hiding models if data selection options are not valid
           tabsetPanel(
             id = "hideIfNoData",
             type = "hidden",
+            
+            # panel that shows model - only shows when data selections are valid and ready to be used
             tabPanel(id = "showingIfData", title = "showingIfData",
+                     
+                     # tabset panel for selecting between different models
                      tabsetPanel(
                        id ="modelSelect",
                        type = "pills",
+                       
+                       # model options
                        tabPanel(id = "slr_panel", title = "Linear Regression", br(), h4("Linear Regression"),p("Select Results based on Linear Regression model:")),
                        tabPanel(id = "stepwise_panel", title = "Best Subset Regression", br(), h4("Best Subset Regression"),p("Select Results based on Best Subset Regression model:")),
                        tabPanel(id = "ridge_panel", title = "Ridge Regression", br(), h4("Ridge Regression"),p("Select Results based on Ridge Regression model:")),
                        tabPanel(id = "lasso_panel", title = "Lasso Regression", br(), h4("Lasso Regression"),p("Select Results based on Lasso Regression model:")),
                        tabPanel(id = "elastic_panel", title = "Elastic Net Regression", br(), h4("Elastic Net Regression"),p("Select Results based on Elastic Net Regression Model")),
                        tabPanel(id = "svr_panel", title = "Support Vector Regression", br(), h4("Support Vector Regression"),p("Select Results based on Support Vector Regression Model")),
-                       tabPanel(id = "rf_panel", title = "Random Forest", br(), h4("Random Forest"),textOutput(outputId = "rf_flag"),bsTooltip(id = "rf_flag", title="Random Forest sample results are precalculated to avoid excessive computations", placement = "left"),),
                        tabPanel(id = "xgb_panel", title = "XG Boost", br(), h4("Extreme Gradient Boosting"),p("Select Results based on Extreme Gradient Boosted model"))
                      ),
+                     
+                     # a data table output to show a couple results 
                      withSpinner(tableOutput(outputId = "selected_model_results"),  type = 6),
                      bsTooltip(id = "selected_model_results", title="Predictions are rounded to two decimal places in this table. For unrounded results, download predictions", placement = "left"),
                      
+                     # buttons to download predictions - .tsv and .csv
                      downloadButton(outputId = "download_predictions", "Download Predictions as .csv"),
                      downloadButton(outputId = "download_predictions_tsv", "Download Predictions as .tsv")
+                     
                      ),
-            tabPanel(id = "notShowingNoData", title = "notShowingNoData", h5("Custom Data has been selected, but a custom data set has not been uploaded yet."))
+            
+            # panel to show when data options are not valid and user must make changes
+            tabPanel(id = "notShowingNoData", 
+                     title = "notShowingNoData", 
+                     h5("Custom Data has been selected, but a custom data set has not been uploaded yet."))
           ),
           
         ), # END OF MODELS TAB
+        
+        # about panel - where users can see more info as well as sample data set results and visualizations
         tabPanel(
           "About", 
           br(),
+          
+          # information about the data set
           p("The models presented here were created using a data set with over 100,000 peptides. Approximately 72,000 peptides were used as a training set to build the models. The remaining peptides serve as a testing set and are presented as the sample data in this application."),
           p("The accuracy of the models is shown with test results of the sample data set, shown below."),
           h3("Sample Dataset Results"), 
+          
+          # predicted v actual plot - xgb
+          bsTooltip(id = "xgb_residuals", title="Green indicates a prediction closer to the actual value, red indicates a prediction further from the actual value", placement = "left"),
           plotOutput(outputId = "xgb_residuals"),
+          
+          # predicted v actual plot - slr
+          bsTooltip(id = "SLR_residuals", title="Green indicates a prediction closer to the actual value, red indicates a prediction further from the actual value", placement = "left"),
           plotOutput(outputId = "SLR_residuals"),
+          
+          # 95% error window size plot
           plotOutput(outputId = "window_plot"),
+          
+          # data tables
           h3("Performance Metrics for Sample Data Set"),
           bsTooltip(id = "sampleResultsTable", title="Sample Data Results are pre-calculated and cached to reduce computation time.", placement = "left"), 
+          
           tableOutput(outputId = "sampleResultsTable"),
           h3("Performance Metrics for Sample Data Set - Phosphorylated Peptides Only"),
           bsTooltip(id = "sampleResultsTablePhos", title="Sample Data Results are pre-calculated and cached to reduce computation time.", placement = "left"), 
@@ -464,7 +506,6 @@ server <- function(input, output)
            "Lasso Regression" = lasso_results(),
            "Elastic Net Regression" = elastic_results(),
            "Support Vector Regression" = svm_results(),
-           "Random Forest" = rf_results(),
            "XG Boost" = xgb_results()
     )
   })
@@ -483,8 +524,7 @@ server <- function(input, output)
     {
       # predict the alignment data with slr
       predictions_of_alignment_data <- predict(slr_one, alignmentDataWithVars())
-      #print(head(predictions_of_alignment_data)) #### DEBUG
-      #print(length(predictions_of_alignment_data)) #### DEBUG
+
       
       # make a data frame for the lm we are about to create
       align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
@@ -659,14 +699,6 @@ server <- function(input, output)
     }
   })
   
-  rf_results <- reactive({
-    switch(input$selectDataButton,
-           "Use Sample Data" = sampleRF$RetentionTime,
-           "Upload Custom Data" = rf_results_custom(),
-           "Upload Custom Data with Alignment Data" = rf_results_align()
-    )
-  })
-  
   svm_results <- reactive({
 
     
@@ -693,26 +725,6 @@ server <- function(input, output)
     }
   })
   
-  rf_results_custom <- reactive({
-    predict(rfModel, selectedData())
-  })
-  
-  rf_results_align <- reactive({
-    predictions_of_alignment_data <- predict(rfModel, alignmentDataWithVars())
-    
-    align_df <- data.frame(predictions_of_alignment_data, alignmentDataWithVars()$RetentionTime)
-    colnames(align_df) <- c("predicts_of_align", "acutal_align") # easier names to work with
-    
-    new_LM <- lm(acutal_align ~ predicts_of_align, data = align_df)
-    
-    predictions_of_selected_data <- predict(rfModel, selectedData())
-    
-    new_df <- as.data.frame(predictions_of_selected_data)
-    colnames(new_df) <- c("predicts_of_align")
-    
-    final_predictions <- predict(new_LM, new_df)
-  })
-  
   # download button
   output$download_predictions <- downloadHandler(
     filename = function(){
@@ -735,7 +747,6 @@ server <- function(input, output)
     }
   )
   
-  output$rf_flag <- renderText({"Select Results based on Random Forest model:"})
 
 
   ################################################ ABOUT TAB #################################
@@ -787,7 +798,7 @@ server <- function(input, output)
   
   
   output$window_plot <- renderPlot({
-    plotCI(x =1:8,
+    plotCI(x =1:7,
            y = windowResults[,4],
            li = windowResults[,2],
            ui = windowResults[,3],
@@ -799,7 +810,7 @@ server <- function(input, output)
            scol = "black"
            )
     axis(side=2)         ## add default y-axis (ticks+labels)
-    axis(side=1,at=1:8,label=c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "RF", "XGB", "SVM"))
+    axis(side=1,at=1:7,label=c("SLR", "Stepwise", "Ridge", "Lasso", "Elastic Net", "XGB", "SVM"))
     box(bty = "l")
   })
   
