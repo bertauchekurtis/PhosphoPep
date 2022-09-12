@@ -8,9 +8,9 @@ Online:
 [Use the Online App Here at shinyapps.io](http://kbertauche.shinyapps.io/phosphopep)
 
 Offline:
--Clone/download this repository
--Run the following command in your terminal (replace the "~" with the path to the application's directory:
-R -e "shiny::runApp('~/PhosphoPep/app.R')"
+- Clone/download this repository
+- Run the following command in your terminal: R -e "shiny::runApp('~/PhosphoPep/app.R')"
+- Note that the "\~" should be replaced with the path to the PhosphoPep directory
 
 If succesful, the last line of the terminal will indicate "listening" with a message such as "Listening on http://xxx.x.x.x:xxxx"
 Copy the address (http://xxx.x.x.x:xxxx) and paste into a browser to view and use the app.
@@ -18,24 +18,25 @@ Copy the address (http://xxx.x.x.x:xxxx) and paste into a browser to view and us
 For more information about running RShiny apps locally, see [this resource (click)](https://shiny.rstudio.com/articles/running.html)
 
 Prerequisites to running PhosphoPep app:
--Installed version of R
+- Installed version of R
+
 Libraries:
--shiny
--stringr
--shinythemes
--shinyBS
--shinycssloaders
--glmnet
--xgboost
--plotrix
+- shiny
+- stringr
+- shinythemes
+- shinyBS
+- shinycssloaders
+- glmnet
+- xgboost
+- plotrix
 
 
 ## Models
 PhosphoPep feature the following models:
--Simple Linear Regression
--Best Subset Regression
--Ridge Regression
--Lasso Regression
--Elastic Net Regression
--Extreme Gradient Boosting
--Support Vector Regression
+- Simple Linear Regression
+- Best Subset Regression
+- Ridge Regression
+- Lasso Regression
+- Elastic Net Regression
+- Extreme Gradient Boosting
+- Support Vector Regression
